@@ -41,6 +41,9 @@ body{
     linear-gradient(#ffe8ba,#ffd894 58%,#e3a85d);
   background-size: 220px 220px, 180px 180px, 250px 250px, 18px 18px, cover;
   touch-action:none;
+  overscroll-behavior:none;
+  -webkit-user-select:none;
+  user-select:none;
 }
 body::before,body::after{
   content:"";
@@ -279,6 +282,8 @@ body::before,body::after{
     inset 0 0 20px rgba(0,0,0,.50),
     0 6px 0 #6c3819,
     0 12px 18px rgba(63,35,17,.35);
+  contain:layout paint;
+  touch-action:none;
 }
 #board::before{
   content:"";
@@ -305,9 +310,13 @@ body::before,body::after{
   line-height:1;
   cursor:pointer;
   user-select:none;
+  -webkit-user-select:none;
   touch-action:none;
-  transform:translateZ(0) scale(1);
-  transition: transform 120ms ease, filter 120ms ease, opacity 140ms ease;
+  transform:translate3d(0,0,0) scale(1);
+  transform-origin:center;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  transition:transform 170ms cubic-bezier(.2,.8,.2,1), filter 120ms ease, opacity 140ms ease;
   text-shadow:
     0 2px 0 rgba(40,18,7,.34),
     1px 0 0 rgba(40,18,7,.20),
@@ -348,6 +357,27 @@ body::before,body::after{
 .t7{background:linear-gradient(135deg,#7ed466,#458c26);border-radius:50% 42% 52% 45%/45% 55% 43% 53%}
 .t8{background:linear-gradient(135deg,#6aa7f1,#336fc5);border-radius:50% 42% 48% 52%}
 .t9{background:linear-gradient(135deg,#f0c23f,#c88508);border-radius:16px}
+.t10{background:linear-gradient(135deg,#55d5c7,#168b83);border-radius:13px 20px 13px 20px}
+.t11{background:linear-gradient(135deg,#e18ee8,#9b3eaa);border-radius:46% 54% 42% 58%/58% 42% 58% 42%}
+.t12{background:linear-gradient(135deg,#ff805f,#c63f2c);border-radius:10px;clip-path:polygon(50% 0,92% 25%,92% 75%,50% 100%,8% 75%,8% 25%)}
+.t13{background:linear-gradient(135deg,#8bb9c7,#3e7180);border-radius:50% 16px 50% 16px}
+.t14{background:linear-gradient(135deg,#b9cf54,#718d1e);border-radius:17px 9px 17px 9px}
+.t15{background:linear-gradient(135deg,#d89557,#925227);border-radius:50% 50% 13px 13px}
+.tile.dragging{
+  z-index:12;
+  transition:none;
+  will-change:transform;
+  filter:brightness(1.12) saturate(1.06);
+  box-shadow:
+    0 8px 14px rgba(31,17,10,.34),
+    inset 3px 3px 0 rgba(255,255,255,.35),
+    inset -4px -5px 0 rgba(0,0,0,.20),
+    0 4px 0 rgba(31,17,10,.42);
+}
+.tile.swapping{
+  z-index:9;
+  will-change:transform;
+}
 .selected{
   transform:translateY(-2px) scale(1.08);
   filter:brightness(1.18) saturate(1.12);
@@ -756,6 +786,8 @@ body::before,body::after{
 
   const SIZE = 8;
   const TOTAL = SIZE * SIZE;
+  const COLOR_COUNT = 16;
+  const SWAP_DURATION = 180;
   const boardEl = document.getElementById("board");
   const scoreEl = document.getElementById("score");
   const bestEl = document.getElementById("best");
@@ -847,7 +879,7 @@ body::before,body::after{
       symbol: arr[0],
       reading: arr[1],
       meaning: arr[2],
-      color: idx % 10
+      color: idx % COLOR_COUNT
     };
   }
 
@@ -856,7 +888,7 @@ body::before,body::after{
     const shuffled = shuffle(conf.pool.map(makeEntry));
     let count = Math.min(conf.symbols + Math.floor((state.level - 1) / 3), conf.pool.length, 15);
     if (state.mode === "hard") count = Math.min(count, 16);
-    state.activeSet = shuffled.slice(0, count).map((entry, idx) => ({...entry, color: idx % 10}));
+    state.activeSet = shuffled.slice(0, count).map((entry, idx) => ({...entry, color: idx % COLOR_COUNT}));
   }
 
   function setTargets(){
@@ -1002,30 +1034,74 @@ body::before,body::after{
     if (!tile || state.locked || state.paused || state.ended) return;
     ev.preventDefault();
     const idx = Number(tile.dataset.index);
-    state.pointer = {idx, x: ev.clientX, y: ev.clientY};
-    boardEl.setPointerCapture?.(ev.pointerId);
+    state.pointer = {
+      idx,
+      pointerId:ev.pointerId,
+      x:ev.clientX,
+      y:ev.clientY,
+      dx:0,
+      dy:0,
+      visualX:0,
+      visualY:0,
+      frame:0,
+      distance:tile.getBoundingClientRect().width + parseFloat(getComputedStyle(boardEl).gap || 0),
+      tile
+    };
+    tile.classList.add("dragging");
+    tile.setPointerCapture?.(ev.pointerId);
+  }, {passive:false});
+
+  boardEl.addEventListener("pointermove", (ev) => {
+    const pointer = state.pointer;
+    if (!pointer || ev.pointerId !== pointer.pointerId) return;
+    ev.preventDefault();
+    pointer.dx = ev.clientX - pointer.x;
+    pointer.dy = ev.clientY - pointer.y;
+    if (pointer.frame) return;
+    pointer.frame = requestAnimationFrame(() => {
+      pointer.frame = 0;
+      if (state.pointer !== pointer) return;
+      const horizontal = Math.abs(pointer.dx) >= Math.abs(pointer.dy);
+      pointer.visualX = horizontal ? Math.max(-pointer.distance, Math.min(pointer.distance, pointer.dx)) : 0;
+      pointer.visualY = horizontal ? 0 : Math.max(-pointer.distance, Math.min(pointer.distance, pointer.dy));
+      pointer.tile.style.transform = `translate3d(${pointer.visualX}px,${pointer.visualY}px,0) scale(1.06)`;
+    });
   }, {passive:false});
 
   boardEl.addEventListener("pointerup", (ev) => {
-    if (!state.pointer || state.locked || state.paused || state.ended) return;
+    const pointer = state.pointer;
+    if (!pointer || ev.pointerId !== pointer.pointerId || state.locked || state.paused || state.ended) return;
     ev.preventDefault();
-    const {idx, x, y} = state.pointer;
     state.pointer = null;
-    const dx = ev.clientX - x;
-    const dy = ev.clientY - y;
-    if (Math.hypot(dx,dy) > 24){
-      const absX = Math.abs(dx), absY = Math.abs(dy);
-      let target = idx;
-      if (absX > absY) target += dx > 0 ? 1 : -1;
-      else target += dy > 0 ? SIZE : -SIZE;
-      if (isAdjacent(idx, target)) trySwap(idx, target);
+    if (pointer.frame) cancelAnimationFrame(pointer.frame);
+    pointer.tile.classList.remove("dragging");
+    pointer.tile.style.transform = "";
+
+    const dx = ev.clientX - pointer.x;
+    const dy = ev.clientY - pointer.y;
+    if (Math.hypot(dx,dy) > 18){
+      const horizontal = Math.abs(dx) >= Math.abs(dy);
+      let target = pointer.idx;
+      target += horizontal ? (dx > 0 ? 1 : -1) : (dy > 0 ? SIZE : -SIZE);
+      if (isAdjacent(pointer.idx, target)){
+        trySwap(pointer.idx, target, {x:pointer.visualX, y:pointer.visualY});
+      }
       return;
     }
-    const tile = ev.target.closest(".tile");
-    tapTile(tile ? Number(tile.dataset.index) : idx);
+    tapTile(pointer.idx);
   }, {passive:false});
 
-  boardEl.addEventListener("pointercancel", () => { state.pointer = null; });
+  function cancelPointer(){
+    const pointer = state.pointer;
+    if (!pointer) return;
+    if (pointer.frame) cancelAnimationFrame(pointer.frame);
+    pointer.tile.classList.remove("dragging");
+    pointer.tile.style.transform = "";
+    state.pointer = null;
+  }
+
+  boardEl.addEventListener("pointercancel", cancelPointer);
+  boardEl.addEventListener("lostpointercapture", cancelPointer);
 
   function tapTile(idx){
     clearHint();
@@ -1054,16 +1130,14 @@ body::before,body::after{
     return Math.abs(ar-br) + Math.abs(ac-bc) === 1;
   }
 
-  async function trySwap(a,b){
+  async function trySwap(a,b, dragOffset = null){
     if (state.locked || !isAdjacent(a,b)) return;
     state.locked = true;
     state.selected = null;
-    swap(a,b);
-    renderBoard();
-    await sleep(100);
+    await animateSwap(a, b, dragOffset);
     const matches = findMatches();
     if (matches.size === 0){
-      swap(a,b);
+      await animateSwap(a, b);
       const extras = new Map([[a,"bad"],[b,"bad"]]);
       renderBoard(extras);
       await sleep(220);
@@ -1074,6 +1148,44 @@ body::before,body::after{
     state.moves--;
     movesEl.textContent = state.moves;
     await resolveMatches(1);
+  }
+
+  async function animateSwap(a,b, dragOffset = null){
+    const first = boardEl.querySelector(`[data-index="${a}"]`);
+    const second = boardEl.querySelector(`[data-index="${b}"]`);
+    if (!first || !second){
+      swap(a,b);
+      renderBoard();
+      return;
+    }
+
+    const firstRect = first.getBoundingClientRect();
+    const secondRect = second.getBoundingClientRect();
+    swap(a,b);
+    renderBoard();
+
+    const tileFromSecond = boardEl.querySelector(`[data-index="${a}"]`);
+    const tileFromFirst = boardEl.querySelector(`[data-index="${b}"]`);
+    const dragX = dragOffset?.x || 0;
+    const dragY = dragOffset?.y || 0;
+    const options = {duration:SWAP_DURATION, easing:"cubic-bezier(.2,.8,.2,1)", fill:"both"};
+    tileFromSecond.classList.add("swapping");
+    tileFromFirst.classList.add("swapping");
+
+    const animations = [
+      tileFromSecond.animate([
+        {transform:`translate3d(${secondRect.left - firstRect.left}px,${secondRect.top - firstRect.top}px,0)`},
+        {transform:"translate3d(0,0,0)"}
+      ], options),
+      tileFromFirst.animate([
+        {transform:`translate3d(${firstRect.left + dragX - secondRect.left}px,${firstRect.top + dragY - secondRect.top}px,0) scale(1.06)`},
+        {transform:"translate3d(0,0,0) scale(1)"}
+      ], options)
+    ];
+
+    await Promise.all(animations.map(animation => animation.finished.catch(() => undefined)));
+    tileFromSecond.classList.remove("swapping");
+    tileFromFirst.classList.remove("swapping");
   }
 
   function swap(a,b){
