@@ -317,6 +317,7 @@ body::before,body::after{
   backface-visibility:hidden;
   -webkit-backface-visibility:hidden;
   transition:transform 170ms cubic-bezier(.2,.8,.2,1), filter 120ms ease, opacity 140ms ease;
+  --hold-x:0px;
   text-shadow:
     0 2px 0 rgba(40,18,7,.34),
     1px 0 0 rgba(40,18,7,.20),
@@ -378,6 +379,21 @@ body::before,body::after{
   z-index:9;
   will-change:transform;
 }
+.tile.holding{
+  z-index:13;
+  filter:brightness(1.18) saturate(1.12);
+  animation:holdWiggle 92ms ease-in-out infinite alternate;
+  box-shadow:
+    0 0 0 3px rgba(255,247,189,.82),
+    0 9px 16px rgba(31,17,10,.34),
+    inset 3px 3px 0 rgba(255,255,255,.4),
+    inset -4px -5px 0 rgba(0,0,0,.2),
+    0 4px 0 rgba(31,17,10,.42);
+}
+@keyframes holdWiggle{
+  from{transform:translate3d(calc(var(--hold-x) - 1.5px),-1px,0) rotate(-1.8deg) scale(1.075)}
+  to{transform:translate3d(calc(var(--hold-x) + 1.5px),1px,0) rotate(1.8deg) scale(1.075)}
+}
 .selected{
   transform:translateY(-2px) scale(1.08);
   filter:brightness(1.18) saturate(1.12);
@@ -396,12 +412,14 @@ body::before,body::after{
   to{filter:brightness(1.45); transform:scale(1.09)}
 }
 .matching{
-  animation:pop .34s ease forwards;
+  z-index:10;
+  animation:matchBurst 430ms cubic-bezier(.18,.76,.24,1) var(--match-delay, 0ms) forwards;
 }
-@keyframes pop{
-  0%{transform:scale(1); opacity:1}
-  45%{transform:scale(1.18) rotate(-3deg); opacity:1}
-  100%{transform:scale(.25) rotate(8deg); opacity:0}
+@keyframes matchBurst{
+  0%{transform:scale(1); opacity:1; filter:brightness(1)}
+  28%{transform:scale(.9); opacity:1; filter:brightness(1.35)}
+  56%{transform:scale(1.28) rotate(-4deg); opacity:1; filter:brightness(1.65) saturate(1.25)}
+  100%{transform:scale(.08) rotate(14deg); opacity:0; filter:brightness(2)}
 }
 .bad{
   animation:shake .24s ease-in-out;
@@ -412,18 +430,52 @@ body::before,body::after{
   50%{transform:translateX(4px)}
   75%{transform:translateX(-3px)}
 }
-.spark{
+.explosion,.burst-particle{
   position:absolute;
-  z-index:8;
+  z-index:18;
+  left:var(--x);
+  top:var(--y);
   pointer-events:none;
-  font-size:18px;
-  color:#ffd45b;
-  text-shadow:1px 1px 0 #7d3615;
-  animation:spark 700ms ease-out forwards;
 }
-@keyframes spark{
-  from{transform:translate(-50%,-50%) scale(.7); opacity:1}
-  to{transform:translate(-50%,-105%) scale(1.5) rotate(18deg); opacity:0}
+.explosion{
+  width:12px;
+  height:12px;
+  margin:-6px;
+  border:3px solid rgba(255,244,164,.95);
+  border-radius:50%;
+  box-shadow:0 0 8px #ffb526, inset 0 0 5px #fff;
+  animation:shockwave 470ms cubic-bezier(.12,.68,.2,1) var(--delay, 0ms) forwards;
+}
+.burst-particle{
+  width:7px;
+  height:7px;
+  margin:-3.5px;
+  border-radius:50% 15% 50% 15%;
+  background:var(--particle-color,#ffd45b);
+  box-shadow:0 0 5px rgba(255,224,101,.8);
+  animation:burstParticle 520ms cubic-bezier(.12,.7,.25,1) var(--delay, 0ms) forwards;
+}
+@keyframes shockwave{
+  0%{transform:scale(.2); opacity:1}
+  70%{opacity:.75}
+  100%{transform:scale(4.8); opacity:0}
+}
+@keyframes burstParticle{
+  0%{transform:translate3d(0,0,0) rotate(0) scale(1); opacity:1}
+  72%{opacity:1}
+  100%{transform:translate3d(var(--dx),var(--dy),0) rotate(var(--spin)) scale(.25); opacity:0}
+}
+.board-impact{
+  animation:boardImpact 240ms ease-out;
+}
+@keyframes boardImpact{
+  0%,100%{filter:brightness(1)}
+  42%{filter:brightness(1.22)}
+}
+@media (prefers-reduced-motion:reduce){
+  .tile.holding{animation-duration:180ms}
+  .matching{animation-duration:220ms}
+  .explosion,.burst-particle{display:none}
 }
 .study{
   position:absolute;
@@ -788,6 +840,8 @@ body::before,body::after{
   const TOTAL = SIZE * SIZE;
   const COLOR_COUNT = 16;
   const SWAP_DURATION = 180;
+  const HOLD_DELAY = 280;
+  let nextTileUid = 1;
   const boardEl = document.getElementById("board");
   const scoreEl = document.getElementById("score");
   const bestEl = document.getElementById("best");
@@ -955,7 +1009,8 @@ body::before,body::after{
   }
 
   function randomTile(){
-    return state.activeSet[Math.floor(Math.random() * state.activeSet.length)];
+    const template = state.activeSet[Math.floor(Math.random() * state.activeSet.length)];
+    return {...template, uid:nextTileUid++};
   }
 
   function wouldMatchAt(index, tile){
@@ -997,6 +1052,7 @@ body::before,body::after{
       btn.type = "button";
       btn.className = "tile" + (tile ? ` t${tile.color}` : "");
       btn.dataset.index = String(i);
+      if (tile) btn.dataset.uid = String(tile.uid);
       btn.setAttribute("aria-label", tile ? `${tile.symbol} ${tile.reading}` : "vacío");
       if (!tile){
         btn.style.opacity = "0";
@@ -1044,9 +1100,18 @@ body::before,body::after{
       visualX:0,
       visualY:0,
       frame:0,
+      holdTimer:0,
+      holding:false,
       distance:tile.getBoundingClientRect().width + parseFloat(getComputedStyle(boardEl).gap || 0),
       tile
     };
+    const pointer = state.pointer;
+    pointer.holdTimer = setTimeout(() => {
+      if (state.pointer !== pointer || Math.hypot(pointer.dx, pointer.dy) > 8) return;
+      pointer.holding = true;
+      pointer.tile.classList.add("holding");
+      navigator.vibrate?.(35);
+    }, HOLD_DELAY);
     tile.classList.add("dragging");
     tile.setPointerCapture?.(ev.pointerId);
   }, {passive:false});
@@ -1057,6 +1122,12 @@ body::before,body::after{
     ev.preventDefault();
     pointer.dx = ev.clientX - pointer.x;
     pointer.dy = ev.clientY - pointer.y;
+    if (Math.hypot(pointer.dx, pointer.dy) > 8 && pointer.holdTimer){
+      clearTimeout(pointer.holdTimer);
+      pointer.holdTimer = 0;
+      pointer.holding = false;
+      pointer.tile.classList.remove("holding");
+    }
     if (pointer.frame) return;
     pointer.frame = requestAnimationFrame(() => {
       pointer.frame = 0;
@@ -1064,7 +1135,8 @@ body::before,body::after{
       const horizontal = Math.abs(pointer.dx) >= Math.abs(pointer.dy);
       pointer.visualX = horizontal ? Math.max(-pointer.distance, Math.min(pointer.distance, pointer.dx)) : 0;
       pointer.visualY = horizontal ? 0 : Math.max(-pointer.distance, Math.min(pointer.distance, pointer.dy));
-      pointer.tile.style.transform = `translate3d(${pointer.visualX}px,${pointer.visualY}px,0) scale(1.06)`;
+      pointer.tile.style.setProperty("--hold-x", `${pointer.visualX}px`);
+      if (!pointer.holding) pointer.tile.style.transform = `translate3d(${pointer.visualX}px,${pointer.visualY}px,0) scale(1.06)`;
     });
   }, {passive:false});
 
@@ -1074,8 +1146,10 @@ body::before,body::after{
     ev.preventDefault();
     state.pointer = null;
     if (pointer.frame) cancelAnimationFrame(pointer.frame);
-    pointer.tile.classList.remove("dragging");
+    clearTimeout(pointer.holdTimer);
+    pointer.tile.classList.remove("dragging", "holding");
     pointer.tile.style.transform = "";
+    pointer.tile.style.removeProperty("--hold-x");
 
     const dx = ev.clientX - pointer.x;
     const dy = ev.clientY - pointer.y;
@@ -1095,8 +1169,10 @@ body::before,body::after{
     const pointer = state.pointer;
     if (!pointer) return;
     if (pointer.frame) cancelAnimationFrame(pointer.frame);
-    pointer.tile.classList.remove("dragging");
+    clearTimeout(pointer.holdTimer);
+    pointer.tile.classList.remove("dragging", "holding");
     pointer.tile.style.transform = "";
+    pointer.tile.style.removeProperty("--hold-x");
     state.pointer = null;
   }
 
@@ -1211,21 +1287,24 @@ body::before,body::after{
     const unique = [...new Map(matchedTiles.map(t => [t.id,t])).values()];
     const extras = new Map([...matches].map(i => [i,"matching"]));
     renderBoard(extras);
-    makeSparks(matches.size);
+    prepareMatchAnimation(matches);
+    makeExplosions(matches);
+    boardEl.classList.remove("board-impact");
+    void boardEl.offsetWidth;
+    boardEl.classList.add("board-impact");
     showStudy(unique[0]);
     updateTargets(matchedTiles);
     const gained = matchedTiles.length * 80 * combo + Math.max(0, unique.length - 1) * 120;
     addScore(gained);
-    await sleep(310);
+    await sleep(540);
 
+    const oldPositions = captureTilePositions();
     for (const i of matches) state.board[i] = null;
-    renderAll();
-    await sleep(70);
-
     collapse();
     refill();
     renderAll();
-    await sleep(160);
+    await animateFalls(oldPositions);
+    boardEl.classList.remove("board-impact");
     await resolveMatches(combo + 1);
   }
 
@@ -1427,18 +1506,76 @@ body::before,body::after{
     studyTimer = setTimeout(() => studyEl.classList.remove("show"), 1550);
   }
 
-  function makeSparks(count){
-    const rect = boardEl.getBoundingClientRect();
-    const amount = Math.min(9, Math.max(3, Math.floor(count / 2)));
-    for (let i=0;i<amount;i++){
-      const sp = document.createElement("div");
-      sp.className = "spark";
-      sp.textContent = ["✦","❀","✧","＊"][i % 4];
-      sp.style.left = (20 + Math.random()*60) + "%";
-      sp.style.top = (20 + Math.random()*60) + "%";
-      boardEl.appendChild(sp);
-      setTimeout(() => sp.remove(), 720);
-    }
+  function prepareMatchAnimation(matches){
+    [...matches].forEach((index, order) => {
+      const tile = boardEl.querySelector(`[data-index="${index}"]`);
+      if (tile) tile.style.setProperty("--match-delay", `${Math.min(order * 12, 48)}ms`);
+    });
+  }
+
+  function makeExplosions(matches){
+    const boardRect = boardEl.getBoundingClientRect();
+    [...matches].forEach((index, order) => {
+      const tile = boardEl.querySelector(`[data-index="${index}"]`);
+      if (!tile) return;
+      const rect = tile.getBoundingClientRect();
+      const x = rect.left - boardRect.left + rect.width / 2;
+      const y = rect.top - boardRect.top + rect.height / 2;
+      const delay = Math.min(order * 12, 48);
+      const ring = document.createElement("i");
+      ring.className = "explosion";
+      ring.style.cssText = `--x:${x}px;--y:${y}px;--delay:${delay}ms`;
+      boardEl.appendChild(ring);
+
+      for (let particleIndex=0;particleIndex<5;particleIndex++){
+        const angle = (Math.PI * 2 * particleIndex / 5) + Math.random() * .35;
+        const distance = 18 + Math.random() * 18;
+        const particle = document.createElement("i");
+        particle.className = "burst-particle";
+        particle.style.cssText = [
+          `--x:${x}px`, `--y:${y}px`, `--delay:${delay}ms`,
+          `--dx:${Math.cos(angle) * distance}px`, `--dy:${Math.sin(angle) * distance}px`,
+          `--spin:${120 + Math.random() * 240}deg`,
+          `--particle-color:${["#fff4a4","#ffbd3d","#ff755f","#ffffff"][particleIndex % 4]}`
+        ].join(";");
+        boardEl.appendChild(particle);
+        setTimeout(() => particle.remove(), 650 + delay);
+      }
+      setTimeout(() => ring.remove(), 600 + delay);
+    });
+    navigator.vibrate?.([18, 28, 24]);
+  }
+
+  function captureTilePositions(){
+    const positions = new Map();
+    boardEl.querySelectorAll(".tile[data-uid]").forEach(tile => {
+      positions.set(tile.dataset.uid, tile.getBoundingClientRect());
+    });
+    return positions;
+  }
+
+  async function animateFalls(oldPositions){
+    const boardRect = boardEl.getBoundingClientRect();
+    const animations = [];
+    boardEl.querySelectorAll(".tile[data-uid]").forEach(tile => {
+      const destination = tile.getBoundingClientRect();
+      const previous = oldPositions.get(tile.dataset.uid);
+      const row = Math.floor(Number(tile.dataset.index) / SIZE);
+      const col = Number(tile.dataset.index) % SIZE;
+      const startY = previous ? previous.top - destination.top : boardRect.top - destination.top - destination.height * (1.2 + row * .16);
+      if (Math.abs(startY) < 1) return;
+      const cells = Math.max(1, Math.round(Math.abs(startY) / Math.max(1, destination.height)));
+      const duration = Math.min(720, 300 + cells * 58 + col * 7);
+      tile.style.zIndex = String(6 + row);
+      const animation = tile.animate([
+        {transform:`translate3d(0,${startY}px,0) scale(.98)`, offset:0, easing:"cubic-bezier(.3,0,.72,.34)"},
+        {transform:"translate3d(0,3px,0) scale(1.015,.985)", offset:.76, easing:"cubic-bezier(.12,.72,.18,1)"},
+        {transform:"translate3d(0,-2px,0) scale(.995,1.005)", offset:.89, easing:"ease-out"},
+        {transform:"translate3d(0,0,0) scale(1)", offset:1}
+      ], {duration, delay:col * 14, fill:"both"});
+      animations.push(animation.finished.catch(() => undefined));
+    });
+    await Promise.all(animations);
   }
 
   function shuffle(arr){
