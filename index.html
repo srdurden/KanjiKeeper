@@ -1,0 +1,1367 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#7a3d1d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="もじマッチ">
+<title>もじマッチ · Moji Match</title>
+<style>
+:root{
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --ink:#3b2416;
+  --dark:#322115;
+  --wood:#70401e;
+  --wood2:#9f612d;
+  --paper:#ffe6b6;
+  --paper2:#f8d89b;
+  --gold:#f7c343;
+  --red:#c75648;
+  --green:#6aa33a;
+  --blue:#3e83d7;
+  --purple:#8768cf;
+  --orange:#d77037;
+  --pink:#ef8195;
+  --cell-gap:4px;
+  --board-max:384px;
+  --tile-font:clamp(23px, 7.8vw, 34px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overflow:hidden}
+body{
+  color:var(--ink);
+  font-family: "Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo",system-ui,-apple-system,sans-serif;
+  background:
+    radial-gradient(circle at 12% 9%, rgba(255,126,146,.30) 0 10px, transparent 11px),
+    radial-gradient(circle at 92% 20%, rgba(255,210,119,.34) 0 8px, transparent 9px),
+    radial-gradient(circle at 24% 90%, rgba(255,126,146,.25) 0 13px, transparent 14px),
+    linear-gradient(45deg, rgba(126,75,32,.07) 25%, transparent 25% 50%, rgba(126,75,32,.07) 50% 75%, transparent 75%),
+    linear-gradient(#ffe8ba,#ffd894 58%,#e3a85d);
+  background-size: 220px 220px, 180px 180px, 250px 250px, 18px 18px, cover;
+  touch-action:none;
+}
+body::before,body::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% 70%, transparent 0 61%, rgba(116,55,25,.28) 100%),
+    repeating-radial-gradient(circle at 88% 24%, transparent 0 17px, rgba(138,72,36,.10) 18px 19px, transparent 20px 38px);
+  mix-blend-mode:multiply;
+}
+#app{
+  position:relative;
+  width:min(100vw, 430px);
+  height:100svh;
+  min-height:640px;
+  margin:0 auto;
+  padding:calc(8px + var(--safe-top)) 8px calc(8px + var(--safe-bottom));
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  filter: drop-shadow(0 12px 18px rgba(75,38,16,.25));
+}
+.frame{
+  position:absolute;
+  inset:calc(4px + var(--safe-top)) 4px calc(4px + var(--safe-bottom));
+  border:4px solid #b87535;
+  border-radius:18px;
+  pointer-events:none;
+  box-shadow:
+    inset 0 0 0 3px #fff1c8,
+    inset 0 0 0 6px #7f421d,
+    inset 0 0 24px rgba(115,58,23,.32);
+}
+.frame::before,.frame::after{
+  content:"❀";
+  position:absolute;
+  color:#e16b79;
+  text-shadow:2px 2px 0 #fff2ca;
+  font-size:26px;
+  top:2px;
+}
+.frame::before{left:10px}
+.frame::after{right:10px}
+
+.top{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns: 1fr 1.03fr .46fr;
+  grid-template-rows:auto auto;
+  gap:6px;
+  align-items:stretch;
+}
+.logo{
+  grid-row:1 / span 2;
+  min-height:88px;
+  border-radius:14px;
+  border:4px solid #7d421e;
+  background:
+    radial-gradient(circle at 28% 12%, rgba(255,255,255,.55) 0 5px, transparent 6px),
+    linear-gradient(#6b3a1d,#3f2415 65%,#28180f);
+  box-shadow: inset 0 0 0 3px #c88a45, 0 5px 0 #4a2814;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:6px;
+  overflow:hidden;
+}
+.logo .jp{
+  line-height:.95;
+  letter-spacing:-4px;
+  font-weight:1000;
+  font-size:clamp(29px, 10vw, 45px);
+  -webkit-text-stroke:2px #fff4d7;
+  text-shadow:
+    3px 3px 0 #74391b,
+    5px 5px 0 rgba(0,0,0,.22);
+}
+.logo .jp span:nth-child(1){color:#ee6b72}
+.logo .jp span:nth-child(2){color:#f2a348}
+.logo .jp span:nth-child(3){color:#b5bf32}
+.logo .jp span:nth-child(4){color:#5ec0b7}
+.logo .jp span:nth-child(5){color:#79b9ee}
+.logo .sub{
+  margin-top:5px;
+  color:#ffe8ac;
+  font-weight:900;
+  font-size:12px;
+  letter-spacing:3px;
+  text-shadow:2px 2px 0 #2f1b10;
+}
+.panel{
+  background:
+    linear-gradient(#fff0c6,#ffd991);
+  border:3px solid #8f4d22;
+  border-radius:14px;
+  box-shadow: inset 0 0 0 3px rgba(255,255,255,.45), 0 4px 0 #6a3518;
+}
+.scoreBox{
+  min-height:58px;
+  padding:5px 8px 6px;
+  text-align:center;
+}
+.label{
+  font-weight:1000;
+  font-size:12px;
+  letter-spacing:.08em;
+}
+.score{
+  font-family:"Courier New",monospace;
+  font-size:clamp(28px, 8vw, 42px);
+  font-weight:1000;
+  line-height:.95;
+  color:#2a1b12;
+  text-shadow:2px 2px 0 rgba(255,255,255,.65);
+}
+.best{
+  margin:4px auto 0;
+  padding:2px 8px;
+  width:max-content;
+  max-width:100%;
+  border-radius:9px;
+  background:#bd8550;
+  color:#fff7d8;
+  font-weight:900;
+  font-size:11px;
+  white-space:nowrap;
+}
+.levelBox{
+  min-height:58px;
+  padding:5px 8px;
+}
+.levelLine{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:8px;
+  font-weight:1000;
+  font-size:13px;
+}
+#level{
+  color:#b8433d;
+  font-size:24px;
+  font-family:"Courier New",monospace;
+}
+.targets{
+  margin-top:3px;
+  display:flex;
+  justify-content:center;
+  gap:4px;
+}
+.target{
+  min-width:38px;
+  text-align:center;
+  transform:translateZ(0);
+}
+.target .mini{
+  width:32px;height:32px;
+  margin:0 auto 0;
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  border:2px solid rgba(255,255,255,.55);
+  color:#fff;
+  font-weight:1000;
+  font-size:20px;
+  text-shadow:1px 2px 0 rgba(0,0,0,.30);
+  box-shadow:inset 2px 2px 0 rgba(255,255,255,.35), inset -3px -3px 0 rgba(0,0,0,.18), 0 3px 0 rgba(70,34,15,.55);
+}
+.target.done{opacity:.45; filter:saturate(.4)}
+.target small{
+  display:block;
+  margin-top:1px;
+  font-family:"Courier New",monospace;
+  font-weight:1000;
+  font-size:13px;
+}
+.movesBox{
+  grid-column:3;
+  grid-row:1 / span 2;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  border-radius:10px;
+  border:4px solid #864319;
+  background:
+    linear-gradient(#fff8d5,#f6c778);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.58), 0 5px 0 #5f2e14;
+}
+.movesBox .kanji{
+  font-weight:1000;
+  font-size:13px;
+}
+.movesBox .num{
+  font-family:"Courier New",monospace;
+  font-size:clamp(34px, 11vw, 52px);
+  line-height:.92;
+  font-weight:1000;
+}
+.movesBox .hand{
+  font-weight:1000;
+  font-size:16px;
+}
+
+.stage{
+  position:relative;
+  z-index:1;
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+#board{
+  position:relative;
+  width:min(calc(100vw - 28px), var(--board-max));
+  aspect-ratio:1/1;
+  padding:7px;
+  display:grid;
+  grid-template-columns:repeat(8,1fr);
+  grid-template-rows:repeat(8,1fr);
+  gap:var(--cell-gap);
+  border:5px solid #975823;
+  border-radius:13px;
+  background:
+    linear-gradient(45deg, rgba(255,255,255,.05) 25%, transparent 25% 50%, rgba(255,255,255,.05) 50% 75%, transparent 75%),
+    linear-gradient(#4a301d,#2e2116);
+  background-size:20px 20px, cover;
+  box-shadow:
+    inset 0 0 0 3px #d59a4a,
+    inset 0 0 20px rgba(0,0,0,.50),
+    0 6px 0 #6c3819,
+    0 12px 18px rgba(63,35,17,.35);
+}
+#board::before{
+  content:"";
+  position:absolute;
+  inset:7px;
+  background-image:
+    linear-gradient(rgba(255,226,145,.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,226,145,.16) 1px, transparent 1px);
+  background-size:calc((100% - 28px)/8) calc((100% - 28px)/8);
+  pointer-events:none;
+  border-radius:7px;
+}
+.tile{
+  position:relative;
+  z-index:2;
+  display:grid;
+  place-items:center;
+  border:none;
+  outline:none;
+  border-radius:14px;
+  color:#fffdf0;
+  font-weight:1000;
+  font-size:var(--tile-font);
+  line-height:1;
+  cursor:pointer;
+  user-select:none;
+  touch-action:none;
+  transform:translateZ(0) scale(1);
+  transition: transform 120ms ease, filter 120ms ease, opacity 140ms ease;
+  text-shadow:
+    0 2px 0 rgba(40,18,7,.34),
+    1px 0 0 rgba(40,18,7,.20),
+    -1px 0 0 rgba(40,18,7,.20);
+  box-shadow:
+    inset 3px 3px 0 rgba(255,255,255,.35),
+    inset -4px -5px 0 rgba(0,0,0,.20),
+    0 3px 0 rgba(31,17,10,.55);
+}
+.tile::before{
+  content:"";
+  position:absolute;
+  inset:5px;
+  border-top:2px dashed rgba(255,255,255,.28);
+  border-left:2px dashed rgba(255,255,255,.20);
+  border-radius:inherit;
+  pointer-events:none;
+}
+.tile::after{
+  content:"";
+  position:absolute;
+  top:5px;
+  left:8px;
+  width:36%;
+  height:18%;
+  border-radius:50%;
+  background:rgba(255,255,255,.30);
+  transform:rotate(-20deg);
+  pointer-events:none;
+}
+.t0{background:linear-gradient(135deg,#ff9ca7,#d44e5f);border-radius:42% 58% 48% 52%/55% 46% 54% 45%}
+.t1{background:linear-gradient(135deg,#68bff9,#2f72c8);border-radius:14px}
+.t2{background:linear-gradient(135deg,#9bd95b,#5b982e);border-radius:38% 50% 36% 48%/42% 44% 52% 48%}
+.t3{background:linear-gradient(135deg,#ffca43,#d98d11);border-radius:15px;clip-path:polygon(15% 0,85% 0,100% 15%,100% 85%,85% 100%,15% 100%,0 85%,0 15%)}
+.t4{background:linear-gradient(135deg,#a889eb,#6e51b9);border-radius:12px 21px 12px 21px;clip-path:polygon(50% 0,100% 23%,100% 77%,50% 100%,0 77%,0 23%)}
+.t5{background:linear-gradient(135deg,#ef8a4f,#c85424);border-radius:50%}
+.t6{background:linear-gradient(135deg,#f8a0a0,#df6270);border-radius:18px 14px 20px 12px}
+.t7{background:linear-gradient(135deg,#7ed466,#458c26);border-radius:50% 42% 52% 45%/45% 55% 43% 53%}
+.t8{background:linear-gradient(135deg,#6aa7f1,#336fc5);border-radius:50% 42% 48% 52%}
+.t9{background:linear-gradient(135deg,#f0c23f,#c88508);border-radius:16px}
+.selected{
+  transform:translateY(-2px) scale(1.08);
+  filter:brightness(1.18) saturate(1.12);
+  box-shadow:
+    0 0 0 3px #fff7bd,
+    0 0 0 6px rgba(247,93,102,.85),
+    inset 3px 3px 0 rgba(255,255,255,.35),
+    inset -4px -5px 0 rgba(0,0,0,.20),
+    0 5px 0 rgba(31,17,10,.45);
+}
+.hint{
+  animation:hintPulse .75s ease-in-out infinite alternate;
+}
+@keyframes hintPulse{
+  from{filter:brightness(1); transform:scale(1)}
+  to{filter:brightness(1.45); transform:scale(1.09)}
+}
+.matching{
+  animation:pop .34s ease forwards;
+}
+@keyframes pop{
+  0%{transform:scale(1); opacity:1}
+  45%{transform:scale(1.18) rotate(-3deg); opacity:1}
+  100%{transform:scale(.25) rotate(8deg); opacity:0}
+}
+.bad{
+  animation:shake .24s ease-in-out;
+}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-4px)}
+  50%{transform:translateX(4px)}
+  75%{transform:translateX(-3px)}
+}
+.spark{
+  position:absolute;
+  z-index:8;
+  pointer-events:none;
+  font-size:18px;
+  color:#ffd45b;
+  text-shadow:1px 1px 0 #7d3615;
+  animation:spark 700ms ease-out forwards;
+}
+@keyframes spark{
+  from{transform:translate(-50%,-50%) scale(.7); opacity:1}
+  to{transform:translate(-50%,-105%) scale(1.5) rotate(18deg); opacity:0}
+}
+.study{
+  position:absolute;
+  left:50%;
+  bottom:8px;
+  z-index:10;
+  width:min(94%, 350px);
+  transform:translateX(-50%) translateY(18px);
+  opacity:0;
+  pointer-events:none;
+  padding:8px 12px;
+  border:3px solid #875022;
+  border-radius:13px;
+  background:linear-gradient(#fff6d0,#ffd88f);
+  box-shadow:0 5px 0 #653616, 0 8px 18px rgba(45,20,6,.22), inset 0 0 0 2px rgba(255,255,255,.55);
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:9px;
+  align-items:center;
+  transition:opacity .18s ease, transform .18s ease;
+}
+.study.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.study .big{
+  min-width:46px;height:46px;
+  display:grid;place-items:center;
+  border-radius:14px;
+  background:linear-gradient(135deg,#df6b73,#b9424d);
+  color:#fff;
+  font-size:29px;
+  font-weight:1000;
+  text-shadow:1px 2px 0 rgba(0,0,0,.25);
+  box-shadow:inset 2px 2px 0 rgba(255,255,255,.35), inset -4px -4px 0 rgba(0,0,0,.18), 0 3px 0 rgba(71,34,14,.45);
+}
+.study .txt{
+  min-width:0;
+  font-weight:900;
+  font-size:13px;
+  line-height:1.15;
+}
+.study .txt span{display:block;font-size:18px;font-weight:1000}
+.bottom{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:1fr 64px 64px 64px;
+  gap:6px;
+  align-items:center;
+}
+.timePanel{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  height:56px;
+  padding:6px 9px;
+  border:3px solid #8b4d22;
+  border-radius:13px;
+  background:linear-gradient(#fff0c6,#ffd38a);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.48), 0 4px 0 #693617;
+}
+.hourglass{
+  font-size:25px;
+  text-shadow:1px 1px 0 #fff;
+}
+.timeBar{
+  flex:1;
+  height:24px;
+  border-radius:9px;
+  background:#3b2818;
+  padding:4px;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.55);
+}
+#timeFill{
+  width:100%;
+  height:100%;
+  border-radius:6px;
+  background:linear-gradient(90deg,#ff6574,#ffc148);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.35);
+  transform-origin:left;
+  transition:width .12s linear;
+}
+.timeLabel{
+  font-weight:1000;
+  font-size:12px;
+  white-space:nowrap;
+}
+.btn{
+  height:56px;
+  border:3px solid #784119;
+  border-radius:13px;
+  background:linear-gradient(#f7c956,#ac6b20);
+  color:#fff8cf;
+  font-weight:1000;
+  font-size:12px;
+  text-shadow:1px 2px 0 rgba(68,27,6,.55);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.28), 0 4px 0 #51290f;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  line-height:1.02;
+  touch-action:manipulation;
+}
+.btn:active{transform:translateY(3px); box-shadow:inset 0 0 0 2px rgba(255,255,255,.28), 0 1px 0 #51290f}
+.btn.blue{background:linear-gradient(#5fa5f3,#2d62b0)}
+.btn.dark{background:linear-gradient(#9b6b38,#6b3b1a)}
+.btn .icon{font-size:22px;line-height:.9}
+.badge{
+  position:absolute;
+  right:-3px;top:-7px;
+  min-width:20px;height:20px;
+  border-radius:50%;
+  background:#d95348;
+  border:2px solid #fff3c8;
+  display:grid;
+  place-items:center;
+  font-size:12px;
+  box-shadow:0 2px 0 #7a2e1f;
+}
+#hintBtn{position:relative}
+
+.overlay{
+  position:absolute;
+  z-index:30;
+  inset:calc(8px + var(--safe-top)) 8px calc(8px + var(--safe-bottom));
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:12px;
+  background:rgba(43,25,13,.28);
+  backdrop-filter:blur(2px);
+  border-radius:15px;
+}
+.overlay.show{display:flex}
+.modal{
+  width:min(100%, 374px);
+  border:5px solid #7b3f1c;
+  border-radius:18px;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(255,116,135,.25) 0 12px, transparent 13px),
+    radial-gradient(circle at 90% 88%, rgba(255,211,99,.32) 0 18px, transparent 19px),
+    linear-gradient(#fff1c8,#ffd790);
+  box-shadow:inset 0 0 0 3px #d99044,0 13px 0 rgba(85,43,18,.45),0 20px 30px rgba(40,18,5,.30);
+  padding:16px;
+  text-align:center;
+  position:relative;
+}
+.modal::before{
+  content:"❀ ❀ ❀";
+  position:absolute;
+  left:0;right:0;top:-18px;
+  color:#e87583;
+  font-size:24px;
+  text-shadow:2px 2px 0 #fff4cf;
+}
+.modal h1{
+  margin:4px 0 4px;
+  font-size:44px;
+  line-height:.95;
+  letter-spacing:-5px;
+  -webkit-text-stroke:2px #fff6d6;
+  text-shadow:3px 4px 0 #7e3a18;
+}
+.modal h1 span:nth-child(1){color:#ef6c75}
+.modal h1 span:nth-child(2){color:#f0a23d}
+.modal h1 span:nth-child(3){color:#aabb31}
+.modal h1 span:nth-child(4){color:#4fc1b3}
+.modal h1 span:nth-child(5){color:#66aee7}
+.modal h2{
+  margin:4px 0 8px;
+  font-size:28px;
+  text-shadow:2px 2px 0 rgba(255,255,255,.55);
+}
+.modal p{
+  margin:8px auto;
+  font-weight:800;
+  line-height:1.32;
+}
+.modeGrid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:9px;
+  margin:12px 0;
+}
+.mode{
+  border:3px solid #7c421e;
+  border-radius:14px;
+  background:linear-gradient(#fff5cf,#f8be6f);
+  min-height:68px;
+  text-align:left;
+  padding:9px 12px;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.45),0 4px 0 #633116;
+  color:var(--ink);
+  font-weight:1000;
+}
+.mode:active{transform:translateY(3px); box-shadow:inset 0 0 0 2px rgba(255,255,255,.45),0 1px 0 #633116}
+.mode strong{display:block;font-size:18px}
+.mode small{display:block;margin-top:2px;font-size:12px;font-weight:900;opacity:.86}
+.primary{
+  min-height:52px;
+  width:100%;
+  border:3px solid #793f19;
+  border-radius:14px;
+  background:linear-gradient(#62b1ff,#285ca8);
+  color:#fff8cf;
+  font-size:18px;
+  font-weight:1000;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.25),0 5px 0 #43210f;
+  text-shadow:1px 2px 0 rgba(25,18,7,.5);
+}
+.primary:active{transform:translateY(3px);box-shadow:inset 0 0 0 2px rgba(255,255,255,.25),0 2px 0 #43210f}
+.menuBtns{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:10px;
+}
+.kakejiku{
+  position:absolute;
+  z-index:0;
+  width:44px;height:120px;
+  border:3px solid #8b4e23;
+  background:linear-gradient(#fff7d4,#f2d89e);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.55),0 4px 0 rgba(101,53,20,.55);
+  display:grid;
+  place-items:center;
+  font-weight:1000;
+  writing-mode:vertical-rl;
+  text-orientation:upright;
+  border-radius:5px;
+  opacity:.85;
+  pointer-events:none;
+}
+.kakejiku.left{left:3px;top:48%}
+.kakejiku.right{right:3px;top:44%;font-size:17px}
+.footerTip{
+  font-size:11px;
+  font-weight:900;
+  opacity:.80;
+}
+.hidden{display:none!important}
+
+@media (max-height:740px){
+  #app{gap:4px;padding:calc(6px + var(--safe-top)) 6px calc(6px + var(--safe-bottom));}
+  .top{grid-template-columns: .9fr 1.07fr .42fr;gap:4px}
+  .logo{min-height:72px;border-width:3px}
+  .logo .sub{display:none}
+  .scoreBox,.levelBox{min-height:50px;padding:4px}
+  .target .mini{width:27px;height:27px;font-size:17px}
+  .target small{font-size:11px}
+  #board{width:min(calc(100vw - 20px), 356px);padding:6px;gap:3px;border-width:4px}
+  .bottom{grid-template-columns:1fr 56px 56px 56px;gap:4px}
+  .btn,.timePanel{height:48px}
+  .btn .icon{font-size:18px}
+  .modal{padding:12px}
+}
+@media (max-width:374px){
+  :root{--cell-gap:3px}
+  .top{grid-template-columns: .8fr 1fr .42fr}
+  .logo .jp{font-size:31px}
+  .logo{min-height:76px}
+  .movesBox .num{font-size:36px}
+  .target{min-width:33px}
+  .target .mini{width:29px;height:29px;font-size:18px}
+  .bottom{grid-template-columns:1fr 54px 54px 54px}
+  .btn{font-size:11px}
+}
+@supports not (height:100svh){
+  #app{height:100vh}
+}
+</style>
+</head>
+<body>
+<div id="app" aria-label="Juego Moji Match">
+  <div class="frame"></div>
+
+  <header class="top" aria-live="polite">
+    <div class="logo" aria-label="もじマッチ">
+      <div class="jp"><span>も</span><span>じ</span><span>マ</span><span>ッ</span><span>チ</span></div>
+      <div class="sub">MOJI MATCH</div>
+    </div>
+
+    <div class="panel scoreBox">
+      <div class="label">スコア</div>
+      <div id="score" class="score">0000000</div>
+      <div id="best" class="best">ベスト 0000000</div>
+    </div>
+
+    <div class="panel levelBox">
+      <div class="levelLine">レベル <span id="level">1</span></div>
+      <div id="targets" class="targets"></div>
+    </div>
+
+    <div class="movesBox">
+      <div class="kanji">目標</div>
+      <div id="moves" class="num">40</div>
+      <div class="hand">手</div>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="kakejiku left">ことば</div>
+    <div class="kakejiku right">一期一会</div>
+    <section id="board" aria-label="Tablero de caracteres japoneses"></section>
+    <div id="study" class="study" aria-live="polite">
+      <div id="studyChar" class="big">あ</div>
+      <div id="studyText" class="txt"><span>あ</span>hiragana · vocal A</div>
+    </div>
+  </main>
+
+  <footer class="bottom">
+    <div class="timePanel">
+      <div class="hourglass">⌛</div>
+      <div class="timeBar"><div id="timeFill"></div></div>
+      <div id="timeLabel" class="timeLabel">タイム</div>
+    </div>
+    <button id="pauseBtn" class="btn blue" type="button"><span class="icon">Ⅱ</span>ポーズ</button>
+    <button id="hintBtn" class="btn" type="button"><span class="badge" id="hintBadge">3</span><span class="icon">💡</span>ヒント</button>
+    <button id="menuBtn" class="btn dark" type="button"><span class="icon">▦</span>メニュー</button>
+  </footer>
+
+  <div id="menuOverlay" class="overlay show">
+    <div class="modal">
+      <h1><span>も</span><span>じ</span><span>マ</span><span>ッ</span><span>チ</span></h1>
+      <p>Intercambia caracteres con el dedo, haz grupos de 3 o más y repasa la lectura al completar combinaciones.</p>
+      <div class="modeGrid">
+        <button class="mode" type="button" data-mode="easy">
+          <strong>やさしい · Fácil</strong>
+          <small>Solo ひらがな. Ideal para calentar.</small>
+        </button>
+        <button class="mode" type="button" data-mode="medium">
+          <strong>ふつう · Medio</strong>
+          <small>ひらがな + カタカナ. Más variedad y ritmo.</small>
+        </button>
+        <button class="mode" type="button" data-mode="hard">
+          <strong>むずかしい · Difícil</strong>
+          <small>ひらがな + カタカナ + 漢字 con lecturas y significado.</small>
+        </button>
+      </div>
+      <p class="footerTip">Sin sonido, autocontenido y optimizado para iPhone 13.</p>
+    </div>
+  </div>
+
+  <div id="pauseOverlay" class="overlay">
+    <div class="modal">
+      <h2 id="resultTitle">ポーズ</h2>
+      <p id="resultText">La partida está pausada.</p>
+      <button id="resumeBtn" class="primary" type="button">つづける</button>
+      <div class="menuBtns">
+        <button id="restartBtn" class="mode" type="button"><strong>もう一回</strong><small>Reiniciar nivel</small></button>
+        <button id="changeModeBtn" class="mode" type="button"><strong>モード</strong><small>Cambiar dificultad</small></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const SIZE = 8;
+  const TOTAL = SIZE * SIZE;
+  const boardEl = document.getElementById("board");
+  const scoreEl = document.getElementById("score");
+  const bestEl = document.getElementById("best");
+  const levelEl = document.getElementById("level");
+  const movesEl = document.getElementById("moves");
+  const targetsEl = document.getElementById("targets");
+  const timeFillEl = document.getElementById("timeFill");
+  const timeLabelEl = document.getElementById("timeLabel");
+  const menuOverlay = document.getElementById("menuOverlay");
+  const pauseOverlay = document.getElementById("pauseOverlay");
+  const resultTitleEl = document.getElementById("resultTitle");
+  const resultTextEl = document.getElementById("resultText");
+  const resumeBtn = document.getElementById("resumeBtn");
+  const restartBtn = document.getElementById("restartBtn");
+  const changeModeBtn = document.getElementById("changeModeBtn");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const hintBtn = document.getElementById("hintBtn");
+  const menuBtn = document.getElementById("menuBtn");
+  const hintBadgeEl = document.getElementById("hintBadge");
+  const studyEl = document.getElementById("study");
+  const studyCharEl = document.getElementById("studyChar");
+  const studyTextEl = document.getElementById("studyText");
+
+  const HIRAGANA = [
+    ["あ","あ","hiragana · vocal A"],["い","い","hiragana · vocal I"],["う","う","hiragana · vocal U"],["え","え","hiragana · vocal E"],["お","お","hiragana · vocal O"],
+    ["か","か","hiragana · KA"],["き","き","hiragana · KI"],["く","く","hiragana · KU"],["け","け","hiragana · KE"],["こ","こ","hiragana · KO"],
+    ["さ","さ","hiragana · SA"],["し","し","hiragana · SHI"],["す","す","hiragana · SU"],["せ","せ","hiragana · SE"],["そ","そ","hiragana · SO"],
+    ["た","た","hiragana · TA"],["ち","ち","hiragana · CHI"],["つ","つ","hiragana · TSU"],["て","て","hiragana · TE"],["と","と","hiragana · TO"],
+    ["な","な","hiragana · NA"],["に","に","hiragana · NI"],["ぬ","ぬ","hiragana · NU"],["ね","ね","hiragana · NE"],["の","の","hiragana · NO"],
+    ["は","は","hiragana · HA"],["ひ","ひ","hiragana · HI"],["ふ","ふ","hiragana · FU"],["へ","へ","hiragana · HE"],["ほ","ほ","hiragana · HO"],
+    ["ま","ま","hiragana · MA"],["み","み","hiragana · MI"],["む","む","hiragana · MU"],["め","め","hiragana · ME"],["も","も","hiragana · MO"],
+    ["や","や","hiragana · YA"],["ゆ","ゆ","hiragana · YU"],["よ","よ","hiragana · YO"],
+    ["ら","ら","hiragana · RA"],["り","り","hiragana · RI"],["る","る","hiragana · RU"],["れ","れ","hiragana · RE"],["ろ","ろ","hiragana · RO"],
+    ["わ","わ","hiragana · WA"],["を","を","hiragana · WO"],["ん","ん","hiragana · N"]
+  ];
+
+  const KATAKANA = [
+    ["ア","あ","katakana · vocal A"],["イ","い","katakana · vocal I"],["ウ","う","katakana · vocal U"],["エ","え","katakana · vocal E"],["オ","お","katakana · vocal O"],
+    ["カ","か","katakana · KA"],["キ","き","katakana · KI"],["ク","く","katakana · KU"],["ケ","け","katakana · KE"],["コ","こ","katakana · KO"],
+    ["サ","さ","katakana · SA"],["シ","し","katakana · SHI"],["ス","す","katakana · SU"],["セ","せ","katakana · SE"],["ソ","そ","katakana · SO"],
+    ["タ","た","katakana · TA"],["チ","ち","katakana · CHI"],["ツ","つ","katakana · TSU"],["テ","て","katakana · TE"],["ト","と","katakana · TO"],
+    ["ナ","な","katakana · NA"],["ニ","に","katakana · NI"],["ヌ","ぬ","katakana · NU"],["ネ","ね","katakana · NE"],["ノ","の","katakana · NO"],
+    ["ハ","は","katakana · HA"],["ヒ","ひ","katakana · HI"],["フ","ふ","katakana · FU"],["ヘ","へ","katakana · HE"],["ホ","ほ","katakana · HO"],
+    ["マ","ま","katakana · MA"],["ミ","み","katakana · MI"],["ム","む","katakana · MU"],["メ","め","katakana · ME"],["モ","も","katakana · MO"],
+    ["ヤ","や","katakana · YA"],["ユ","ゆ","katakana · YU"],["ヨ","よ","katakana · YO"],
+    ["ラ","ら","katakana · RA"],["リ","り","katakana · RI"],["ル","る","katakana · RU"],["レ","れ","katakana · RE"],["ロ","ろ","katakana · RO"],
+    ["ワ","わ","katakana · WA"],["ヲ","を","katakana · WO"],["ン","ん","katakana · N"]
+  ];
+
+  const KANJI = [
+    ["日","にち / ひ","sol · día"],["月","げつ / つき","luna · mes"],["火","か / ひ","fuego"],["水","すい / みず","agua"],["木","もく / き","árbol · madera"],
+    ["金","きん / かね","oro · dinero"],["土","ど / つち","tierra"],["山","やま","montaña"],["川","かわ","río"],["海","うみ","mar"],
+    ["雨","あめ","lluvia"],["空","そら","cielo"],["森","もり","bosque"],["花","はな","flor"],["白","しろ / はく","blanco"],
+    ["本","ほん","libro · origen"],["文","ぶん","texto"],["学","がく","estudio"],["語","ご","idioma · palabra"],["名","な / めい","nombre"],
+    ["人","ひと / じん","persona"],["口","くち","boca"],["目","め","ojo"],["手","て","mano"],["力","ちから","fuerza"],
+    ["王","おう","rey"],["音","おと / おん","sonido"],["車","くるま","coche"],["駅","えき","estación"],["猫","ねこ","gato"]
+  ];
+
+  const CONFIG = {
+    easy:   {name:"やさしい", pool: HIRAGANA, symbols:8,  time:95, moves:45, targetCount:10},
+    medium: {name:"ふつう",   pool: HIRAGANA.concat(KATAKANA), symbols:10, time:80, moves:40, targetCount:11},
+    hard:   {name:"むずかしい", pool: HIRAGANA.concat(KATAKANA).concat(KANJI), symbols:12, time:70, moves:36, targetCount:12}
+  };
+
+  const state = {
+    mode:"easy",
+    level:1,
+    score:0,
+    best:0,
+    moves:40,
+    timeLeft:90,
+    timeMax:90,
+    hints:3,
+    locked:true,
+    paused:false,
+    ended:false,
+    selected:null,
+    board:[],
+    activeSet:[],
+    targets:new Map(),
+    timer:null,
+    pointer:null,
+    hintCells:[]
+  };
+
+  function makeEntry(arr, idx){
+    return {
+      id: arr[0],
+      symbol: arr[0],
+      reading: arr[1],
+      meaning: arr[2],
+      color: idx % 10
+    };
+  }
+
+  function chooseActiveSet(){
+    const conf = CONFIG[state.mode];
+    const shuffled = shuffle(conf.pool.map(makeEntry));
+    let count = Math.min(conf.symbols + Math.floor((state.level - 1) / 3), conf.pool.length, 15);
+    if (state.mode === "hard") count = Math.min(count, 16);
+    state.activeSet = shuffled.slice(0, count).map((entry, idx) => ({...entry, color: idx % 10}));
+  }
+
+  function setTargets(){
+    const conf = CONFIG[state.mode];
+    const choices = shuffle(state.activeSet.slice()).slice(0, 4);
+    state.targets = new Map();
+    const levelBoost = Math.min(5, Math.floor((state.level - 1) / 2));
+    choices.forEach((entry, idx) => {
+      const amount = conf.targetCount + levelBoost + idx % 2;
+      state.targets.set(entry.id, amount);
+    });
+  }
+
+  function startGame(mode){
+    state.mode = mode;
+    state.level = 1;
+    state.score = 0;
+    state.best = Number(localStorage.getItem(bestKey())) || 0;
+    menuOverlay.classList.remove("show");
+    startLevel();
+  }
+
+  function bestKey(){
+    return "moji-match-best-" + state.mode;
+  }
+
+  function startLevel(){
+    clearInterval(state.timer);
+    state.ended = false;
+    state.paused = false;
+    state.locked = true;
+    state.selected = null;
+    state.hintCells = [];
+    const conf = CONFIG[state.mode];
+    chooseActiveSet();
+    setTargets();
+    state.moves = Math.max(22, conf.moves - Math.floor((state.level - 1) * 1.2));
+    state.timeMax = Math.max(45, conf.time - Math.floor((state.level - 1) * 1.5));
+    state.timeLeft = state.timeMax;
+    state.hints = 3;
+    makeBoard();
+    renderAll();
+    pauseOverlay.classList.remove("show");
+    state.locked = false;
+    startTimer();
+    showStudy({symbol:"始", reading:"はじめ", meaning: CONFIG[state.mode].name + " · レベル " + state.level});
+  }
+
+  function makeBoard(){
+    let attempts = 0;
+    do {
+      attempts++;
+      state.board = new Array(TOTAL).fill(null);
+      for (let i=0;i<TOTAL;i++){
+        let candidate = randomTile();
+        let guard = 0;
+        while (wouldMatchAt(i, candidate) && guard < 80){
+          candidate = randomTile();
+          guard++;
+        }
+        state.board[i] = candidate;
+      }
+    } while ((!findAnyMove() || findMatches().size > 0) && attempts < 120);
+  }
+
+  function randomTile(){
+    return state.activeSet[Math.floor(Math.random() * state.activeSet.length)];
+  }
+
+  function wouldMatchAt(index, tile){
+    const row = Math.floor(index / SIZE);
+    const col = index % SIZE;
+    if (col >= 2 && state.board[index-1]?.id === tile.id && state.board[index-2]?.id === tile.id) return true;
+    if (row >= 2 && state.board[index-SIZE]?.id === tile.id && state.board[index-SIZE*2]?.id === tile.id) return true;
+    return false;
+  }
+
+  function renderAll(){
+    scoreEl.textContent = padScore(state.score);
+    bestEl.textContent = "ベスト " + padScore(state.best);
+    levelEl.textContent = state.level;
+    movesEl.textContent = state.moves;
+    hintBadgeEl.textContent = state.hints;
+    timeLabelEl.textContent = Math.ceil(state.timeLeft) + "秒";
+    timeFillEl.style.width = Math.max(0, Math.min(100, (state.timeLeft / state.timeMax) * 100)) + "%";
+    renderTargets();
+    renderBoard();
+  }
+
+  function renderTargets(){
+    targetsEl.innerHTML = "";
+    for (const [id, count] of state.targets.entries()){
+      const tile = state.activeSet.find(t => t.id === id);
+      const node = document.createElement("div");
+      node.className = "target" + (count <= 0 ? " done" : "");
+      node.innerHTML = `<div class="mini t${tile?.color ?? 0}">${tile?.symbol ?? id}</div><small>${Math.max(0,count)}</small>`;
+      targetsEl.appendChild(node);
+    }
+  }
+
+  function renderBoard(extraClasses = new Map()){
+    boardEl.innerHTML = "";
+    for (let i=0;i<TOTAL;i++){
+      const tile = state.board[i];
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "tile" + (tile ? ` t${tile.color}` : "");
+      btn.dataset.index = String(i);
+      btn.setAttribute("aria-label", tile ? `${tile.symbol} ${tile.reading}` : "vacío");
+      if (!tile){
+        btn.style.opacity = "0";
+        btn.textContent = "";
+      } else {
+        btn.textContent = tile.symbol;
+      }
+      if (state.selected === i) btn.classList.add("selected");
+      if (state.hintCells.includes(i)) btn.classList.add("hint");
+      const extras = extraClasses.get(i);
+      if (extras) btn.classList.add(...extras.split(" "));
+      boardEl.appendChild(btn);
+    }
+  }
+
+  function padScore(n){
+    return String(Math.max(0, n)).padStart(7, "0");
+  }
+
+  function startTimer(){
+    clearInterval(state.timer);
+    state.timer = setInterval(() => {
+      if (state.locked || state.paused || state.ended) return;
+      state.timeLeft = Math.max(0, state.timeLeft - 0.1);
+      timeLabelEl.textContent = Math.ceil(state.timeLeft) + "秒";
+      timeFillEl.style.width = Math.max(0, Math.min(100, (state.timeLeft / state.timeMax) * 100)) + "%";
+      if (state.timeLeft <= 0) {
+        failLevel("タイムアップ", "Se ha acabado el tiempo. Repasamos y volvemos a intentarlo.");
+      }
+    }, 100);
+  }
+
+  boardEl.addEventListener("pointerdown", (ev) => {
+    const tile = ev.target.closest(".tile");
+    if (!tile || state.locked || state.paused || state.ended) return;
+    ev.preventDefault();
+    const idx = Number(tile.dataset.index);
+    state.pointer = {idx, x: ev.clientX, y: ev.clientY};
+    boardEl.setPointerCapture?.(ev.pointerId);
+  }, {passive:false});
+
+  boardEl.addEventListener("pointerup", (ev) => {
+    if (!state.pointer || state.locked || state.paused || state.ended) return;
+    ev.preventDefault();
+    const {idx, x, y} = state.pointer;
+    state.pointer = null;
+    const dx = ev.clientX - x;
+    const dy = ev.clientY - y;
+    if (Math.hypot(dx,dy) > 24){
+      const absX = Math.abs(dx), absY = Math.abs(dy);
+      let target = idx;
+      if (absX > absY) target += dx > 0 ? 1 : -1;
+      else target += dy > 0 ? SIZE : -SIZE;
+      if (isAdjacent(idx, target)) trySwap(idx, target);
+      return;
+    }
+    const tile = ev.target.closest(".tile");
+    tapTile(tile ? Number(tile.dataset.index) : idx);
+  }, {passive:false});
+
+  boardEl.addEventListener("pointercancel", () => { state.pointer = null; });
+
+  function tapTile(idx){
+    clearHint();
+    if (state.selected === null){
+      state.selected = idx;
+      renderBoard();
+      return;
+    }
+    if (state.selected === idx){
+      state.selected = null;
+      renderBoard();
+      return;
+    }
+    if (isAdjacent(state.selected, idx)){
+      trySwap(state.selected, idx);
+    } else {
+      state.selected = idx;
+      renderBoard();
+    }
+  }
+
+  function isAdjacent(a,b){
+    if (b < 0 || b >= TOTAL) return false;
+    const ar = Math.floor(a / SIZE), ac = a % SIZE;
+    const br = Math.floor(b / SIZE), bc = b % SIZE;
+    return Math.abs(ar-br) + Math.abs(ac-bc) === 1;
+  }
+
+  async function trySwap(a,b){
+    if (state.locked || !isAdjacent(a,b)) return;
+    state.locked = true;
+    state.selected = null;
+    swap(a,b);
+    renderBoard();
+    await sleep(100);
+    const matches = findMatches();
+    if (matches.size === 0){
+      swap(a,b);
+      const extras = new Map([[a,"bad"],[b,"bad"]]);
+      renderBoard(extras);
+      await sleep(220);
+      state.locked = false;
+      renderBoard();
+      return;
+    }
+    state.moves--;
+    movesEl.textContent = state.moves;
+    await resolveMatches(1);
+  }
+
+  function swap(a,b){
+    const temp = state.board[a];
+    state.board[a] = state.board[b];
+    state.board[b] = temp;
+  }
+
+  async function resolveMatches(combo){
+    let matches = findMatches();
+    if (matches.size === 0){
+      state.locked = false;
+      renderAll();
+      if (isLevelCleared()) return clearLevel();
+      if (state.moves <= 0) return failLevel("手がない", "No quedan movimientos. Puedes repetir el nivel.");
+      if (!findAnyMove()){
+        await shuffleBoardWithToast();
+      }
+      return;
+    }
+
+    const matchedTiles = [...matches].map(i => state.board[i]).filter(Boolean);
+    const unique = [...new Map(matchedTiles.map(t => [t.id,t])).values()];
+    const extras = new Map([...matches].map(i => [i,"matching"]));
+    renderBoard(extras);
+    makeSparks(matches.size);
+    showStudy(unique[0]);
+    updateTargets(matchedTiles);
+    const gained = matchedTiles.length * 80 * combo + Math.max(0, unique.length - 1) * 120;
+    addScore(gained);
+    await sleep(310);
+
+    for (const i of matches) state.board[i] = null;
+    renderAll();
+    await sleep(70);
+
+    collapse();
+    refill();
+    renderAll();
+    await sleep(160);
+    await resolveMatches(combo + 1);
+  }
+
+  function updateTargets(tiles){
+    for (const tile of tiles){
+      if (state.targets.has(tile.id)){
+        state.targets.set(tile.id, state.targets.get(tile.id) - 1);
+      }
+    }
+    renderTargets();
+  }
+
+  function addScore(points){
+    state.score += points;
+    if (state.score > state.best){
+      state.best = state.score;
+      localStorage.setItem(bestKey(), String(state.best));
+    }
+    scoreEl.textContent = padScore(state.score);
+    bestEl.textContent = "ベスト " + padScore(state.best);
+  }
+
+  function findMatches(){
+    const set = new Set();
+
+    for (let r=0;r<SIZE;r++){
+      let runStart = 0;
+      for (let c=1;c<=SIZE;c++){
+        const prev = state.board[r*SIZE + c - 1]?.id;
+        const current = c < SIZE ? state.board[r*SIZE + c]?.id : null;
+        if (current !== prev){
+          const len = c - runStart;
+          if (prev && len >= 3){
+            for (let k=runStart;k<c;k++) set.add(r*SIZE + k);
+          }
+          runStart = c;
+        }
+      }
+    }
+
+    for (let c=0;c<SIZE;c++){
+      let runStart = 0;
+      for (let r=1;r<=SIZE;r++){
+        const prev = state.board[(r-1)*SIZE + c]?.id;
+        const current = r < SIZE ? state.board[r*SIZE + c]?.id : null;
+        if (current !== prev){
+          const len = r - runStart;
+          if (prev && len >= 3){
+            for (let k=runStart;k<r;k++) set.add(k*SIZE + c);
+          }
+          runStart = r;
+        }
+      }
+    }
+
+    return set;
+  }
+
+  function collapse(){
+    for (let c=0;c<SIZE;c++){
+      const kept = [];
+      for (let r=SIZE-1;r>=0;r--){
+        const tile = state.board[r*SIZE + c];
+        if (tile) kept.push(tile);
+      }
+      for (let r=SIZE-1, k=0;r>=0;r--, k++){
+        state.board[r*SIZE + c] = kept[k] || null;
+      }
+    }
+  }
+
+  function refill(){
+    for (let i=0;i<TOTAL;i++){
+      if (!state.board[i]) state.board[i] = randomTile();
+    }
+  }
+
+  function findAnyMove(){
+    for (let i=0;i<TOTAL;i++){
+      const candidates = [i+1, i+SIZE];
+      for (const j of candidates){
+        if (!isAdjacent(i,j)) continue;
+        swap(i,j);
+        const ok = findMatches().size > 0;
+        swap(i,j);
+        if (ok) return [i,j];
+      }
+    }
+    return null;
+  }
+
+  async function shuffleBoardWithToast(){
+    showStudy({symbol:"混", reading:"まぜる", meaning:"Sin movimientos: mezclando el tablero"});
+    state.locked = true;
+    let guard = 0;
+    do {
+      state.board = shuffle(state.board);
+      guard++;
+    } while ((findMatches().size > 0 || !findAnyMove()) && guard < 90);
+    renderBoard();
+    await sleep(300);
+    state.locked = false;
+  }
+
+  function isLevelCleared(){
+    for (const count of state.targets.values()){
+      if (count > 0) return false;
+    }
+    return true;
+  }
+
+  function clearLevel(){
+    if (state.ended) return;
+    state.ended = true;
+    state.locked = true;
+    clearInterval(state.timer);
+    const bonus = Math.ceil(state.timeLeft) * 25 + state.moves * 70;
+    addScore(bonus);
+    resultTitleEl.textContent = "よくできました！";
+    resultTextEl.textContent = `Nivel ${state.level} superado. Bonus: ${bonus} puntos.`;
+    resumeBtn.textContent = "つぎのレベル";
+    pauseOverlay.classList.add("show");
+    resumeBtn.onclick = () => {
+      state.level++;
+      startLevel();
+    };
+  }
+
+  function failLevel(title, text){
+    if (state.ended) return;
+    state.ended = true;
+    state.locked = true;
+    clearInterval(state.timer);
+    resultTitleEl.textContent = title;
+    resultTextEl.textContent = text;
+    resumeBtn.textContent = "もう一回";
+    pauseOverlay.classList.add("show");
+    resumeBtn.onclick = () => startLevel();
+  }
+
+  function showPause(){
+    if (state.ended || menuOverlay.classList.contains("show")) return;
+    state.paused = true;
+    state.locked = true;
+    resultTitleEl.textContent = "ポーズ";
+    resultTextEl.textContent = "Partida pausada. El temporizador está detenido.";
+    resumeBtn.textContent = "つづける";
+    pauseOverlay.classList.add("show");
+    resumeBtn.onclick = () => {
+      pauseOverlay.classList.remove("show");
+      state.paused = false;
+      state.locked = false;
+    };
+  }
+
+  pauseBtn.addEventListener("click", showPause);
+  menuBtn.addEventListener("click", () => {
+    state.paused = true;
+    state.locked = true;
+    menuOverlay.classList.add("show");
+  });
+  hintBtn.addEventListener("click", () => {
+    if (state.locked || state.paused || state.ended || state.hints <= 0) return;
+    const move = findAnyMove();
+    if (!move) return;
+    state.hints--;
+    hintBadgeEl.textContent = state.hints;
+    state.hintCells = move;
+    renderBoard();
+    setTimeout(clearHint, 1600);
+  });
+  restartBtn.addEventListener("click", () => startLevel());
+  changeModeBtn.addEventListener("click", () => {
+    pauseOverlay.classList.remove("show");
+    menuOverlay.classList.add("show");
+  });
+  document.querySelectorAll(".mode[data-mode]").forEach(btn => {
+    btn.addEventListener("click", () => startGame(btn.dataset.mode));
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && !state.ended && !menuOverlay.classList.contains("show")) showPause();
+  });
+
+  function clearHint(){
+    if (state.hintCells.length){
+      state.hintCells = [];
+      renderBoard();
+    }
+  }
+
+  let studyTimer = null;
+  function showStudy(tile){
+    if (!tile) return;
+    studyCharEl.textContent = tile.symbol;
+    studyTextEl.innerHTML = `<span>${escapeHtml(tile.symbol)}（${escapeHtml(tile.reading)}）</span>${escapeHtml(tile.meaning)}`;
+    studyEl.classList.add("show");
+    clearTimeout(studyTimer);
+    studyTimer = setTimeout(() => studyEl.classList.remove("show"), 1550);
+  }
+
+  function makeSparks(count){
+    const rect = boardEl.getBoundingClientRect();
+    const amount = Math.min(9, Math.max(3, Math.floor(count / 2)));
+    for (let i=0;i<amount;i++){
+      const sp = document.createElement("div");
+      sp.className = "spark";
+      sp.textContent = ["✦","❀","✧","＊"][i % 4];
+      sp.style.left = (20 + Math.random()*60) + "%";
+      sp.style.top = (20 + Math.random()*60) + "%";
+      boardEl.appendChild(sp);
+      setTimeout(() => sp.remove(), 720);
+    }
+  }
+
+  function shuffle(arr){
+    const out = arr.slice();
+    for (let i=out.length-1;i>0;i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
+    }
+    return out;
+  }
+
+  function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, ch => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#039;"
+    }[ch]));
+  }
+
+  // Prepare an attractive idle board behind the menu.
+  state.best = Number(localStorage.getItem(bestKey())) || 0;
+  chooseActiveSet();
+  setTargets();
+  state.moves = CONFIG.easy.moves;
+  state.timeMax = CONFIG.easy.time;
+  state.timeLeft = state.timeMax;
+  makeBoard();
+  renderAll();
+})();
+</script>
+</body>
+</html>
